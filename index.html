@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Module Lens Splitter</title>
+    <style>
+        :root { --primary: #1a73e8; --success: #34a853; --bg: #f8f9fa; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: var(--bg); padding: 20px; color: #333; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+        h2 { color: var(--primary); text-align: center; margin-bottom: 20px; }
+        
+        /* Module Selector */
+        .module-selector { margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        select { padding: 10px; border-radius: 8px; border: 2px solid #dfe1e5; outline: none; flex-grow: 1; font-size: 14px; }
+
+        textarea { width: 100%; height: 120px; padding: 12px; border: 2px solid #dfe1e5; border-radius: 8px; font-size: 14px; resize: vertical; box-sizing: border-box; }
+        
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-process { background-color: var(--primary); color: white; }
+        .btn-process:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-clear { background-color: #dadce0; color: #3c4043; }
+        
+        .result-card { margin-top: 25px; border: 1px solid #e8eaed; border-radius: 12px; padding: 5px 15px; background: #fff; }
+        .field-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+        .field-row:last-child { border-bottom: none; }
+        .label { font-weight: 700; color: #70757a; width: 120px; font-size: 12px; text-transform: uppercase; }
+        .value { flex-grow: 1; margin: 0 15px; color: #202124; font-size: 15px; }
+        .copy-btn { background: #e6f4ea; color: var(--success); padding: 6px 12px; font-size: 12px; border-radius: 6px; width: auto; flex: none; }
+        .copy-btn:hover { background: var(--success); color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Data Pro</h2>
+    
+    <div class="module-selector">
+        <label>Select Module:</label>
+        <select id="moduleSelect">
+            <option value="standard">Standard Contact Splitter</option>
+            <option value="raw_cleaner">Just Clean Lines (No Split)</option>
+            </select>
+    </div>
+
+    <textarea id="rawInput" placeholder="Paste Lens data here..."></textarea>
+    
+    <div class="btn-group">
+        <button class="btn-process" onclick="handleProcessing()">Process Data</button>
+        <button class="btn-clear" onclick="clearAll()">Clear</button>
+    </div>
+
+    <div id="outputArea" style="display:none;">
+        <div class="result-card" id="resultCard"></div>
+    </div>
+</div>
+
+<script>
+    /**
+     * MODULE REGISTRY
+     * To add a new module: 
+     * 1. Add a function here that returns an array of {label, value} objects.
+     * 2. Add an <option> in the HTML select above.
+     */
+    const Parsers = {
+        // Module 1: Original Splitter Logic
+        standard: (lines) => {
+            const id = lines[0];
+            const hasShortTitle = lines[1] && lines[1].length < 5;
+            const name = hasShortTitle ? `${lines[1]} ${lines[2]}` : lines[1];
+            const addressStart = hasShortTitle ? 3 : 2;
+            const phone = lines[lines.length - 1];
+            const address = lines.slice(addressStart, lines.length - 1).join(", ");
+
+            return [
+                { label: 'ID', value: id },
+                { label: 'Name', value: name },
+                { label: 'Address', value: address },
+                { label: 'Phone', value: phone }
+            ];
+        },
+
+        // Module 2: Simple Cleaner
+        raw_cleaner: (lines) => {
+            return lines.map((line, index) => ({
+                label: `Line ${index + 1}`,
+                value: line
+            }));
+        }
+    };
+
+    function handleProcessing() {
+        const input = document.getElementById('rawInput').value;
+        const selectedModule = document.getElementById('moduleSelect').value;
+        
+        if (!input.trim()) return;
+
+        // Shared Pre-processing
+        let lines = input.split('\n')
+                         .map(line => line.replace(/\.\./g, '').trim())
+                         .filter(line => line.length > 0);
+
+        if (lines.length === 0) return;
+
+        // Execute selected module
+        const resultData = Parsers[selectedModule](lines);
+        displayResults(resultData);
+    }
+
+    function displayResults(fields) {
+        const card = document.getElementById('resultCard');
+        const area = document.getElementById('outputArea');
+        
+        card.innerHTML = fields.map((f, index) => `
+            <div class="field-row">
+                <span class="label">${f.label}</span>
+                <span class="value" id="val-${index}">${f.value}</span>
+                <button class="copy-btn" onclick="copyToClipboard('val-${index}', this)">Copy</button>
+            </div>
+        `).join('');
+
+        area.style.display = 'block';
+    }
+
+    async function copyToClipboard(elementId, btn) {
+        const text = document.getElementById(elementId).innerText;
+        try {
+            await navigator.clipboard.writeText(text);
+            const originalText = btn.innerText;
+            btn.innerText = "Copied!";
+            btn.style.background = "#34a853";
+            btn.style.color = "white";
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.style.background = "#e6f4ea";
+                btn.style.color = "#34a853";
+            }, 1000);
+        } catch (err) {
+            console.error('Failed to copy!', err);
+        }
+    }
+
+    function clearAll() {
+        document.getElementById('rawInput').value = '';
+        document.getElementById('outputArea').style.display = 'none';
+    }
+</script>
+
+</body>
+</html>
