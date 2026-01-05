@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intelligence Lens Splitter</title>
+    <title>AI Intelligence Lens Splitter</title>
     <style>
         :root { 
             --primary: #1a73e8; --success: #34a853; --error: #d93025;
             --bg: #f8f9fa; --text: #202124; --border: #dfe1e5;
         }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: var(--bg); padding: 20px; color: var(--text); }
-        .container { max-width: 700px; margin: auto; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+        .container { max-width: 750px; margin: auto; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
         
         h2 { color: var(--primary); text-align: center; margin: 0; }
         .subtitle { text-align: center; font-size: 12px; color: #5f6368; margin-bottom: 20px; }
@@ -18,6 +18,7 @@
         textarea { 
             width: 100%; height: 120px; padding: 15px; border: 2px solid var(--border); 
             border-radius: 12px; font-size: 14px; box-sizing: border-box; transition: 0.3s;
+            line-height: 1.5;
         }
         textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(26,115,232,0.15); }
         
@@ -28,45 +29,42 @@
         
         #outputArea { margin-top: 25px; display: none; }
         .action-bar { 
-            background: #e8f0fe; padding: 15px; border-radius: 10px; border: 1px dashed var(--primary); 
-            margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; 
+            background: #e8f0fe; padding: 12px; border-radius: 10px; border: 1px dashed var(--primary); 
+            margin-bottom: 20px; display: flex; gap: 10px; justify-content: space-between;
         }
         
         .btn-contact { background-color: var(--success); color: white; padding: 8px 16px; font-size: 13px; border-radius: 6px; }
+        .btn-copy-all { background-color: #3c4043; color: white; padding: 8px 16px; font-size: 13px; border-radius: 6px; }
 
         .result-card { border: 1px solid #e8eaed; border-radius: 12px; background: #fff; overflow: hidden; }
-        .field-row { display: grid; grid-template-columns: 110px 1fr auto; align-items: center; padding: 12px 15px; border-bottom: 1px solid #f1f3f4; gap: 10px; }
+        .field-row { display: grid; grid-template-columns: 140px 1fr auto; align-items: center; padding: 12px 15px; border-bottom: 1px solid #f1f3f4; gap: 10px; }
         .field-row:last-child { border-bottom: none; }
         
         .label { font-weight: 700; color: #70757a; font-size: 11px; text-transform: uppercase; }
-        .value { color: var(--text); font-size: 15px; padding: 5px; border-radius: 4px; border: 1px solid transparent; }
+        .value { color: var(--text); font-size: 15px; padding: 6px; border-radius: 4px; border: 1px solid transparent; }
         .value[contenteditable="true"]:focus { outline: none; background: #fff; border-color: var(--primary); }
         
-        /* Validation Styles */
-        .invalid { border-color: var(--error) !important; color: var(--error); background: #fce8e6; }
-        .error-msg { font-size: 10px; color: var(--error); display: none; margin-top: 2px; }
-        .invalid + .error-msg { display: block; }
-
+        .invalid { border: 1px solid var(--error) !important; color: var(--error); background: #fce8e6; }
         .copy-btn { background: #f1f3f4; color: #5f6368; padding: 6px 12px; font-size: 11px; border-radius: 6px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Data Splitter Pro</h2>
-    <div class="subtitle">Clean, Validate, and Save Contacts</div>
+    <h2>AI Intelligence Data Splitter</h2>
+    <div class="subtitle">Supports Mr/Mrs/Miss Merging & Single-Line Analysis</div>
     
-    <textarea id="rawInput" placeholder="Paste Lens data here (ID, Name, Gender, Address, Phone)..."></textarea>
+    <textarea id="rawInput" placeholder="Paste data here... (e.g. 101 Mr. John Doe 9876543210)"></textarea>
     
     <div class="btn-group">
-        <button class="btn-process" onclick="processData()">Clean & Validate</button>
+        <button class="btn-process" onclick="processData()">Analyze & Split</button>
         <button class="btn-clear" onclick="clearAll()">Clear</button>
     </div>
 
     <div id="outputArea">
         <div class="action-bar">
-            <span style="font-weight:600; color:var(--primary)">✓ Data Validated</span>
-            <button class="btn-contact" onclick="downloadVCF()">💾 Save to Contacts</button>
+            <button class="btn-copy-all" onclick="copyFullData()">📋 Copy All Data</button>
+            <button class="btn-contact" onclick="downloadVCF()">💾 Save Contact</button>
         </div>
         <div class="result-card" id="resultCard"></div>
     </div>
@@ -75,67 +73,88 @@
 <script>
     let currentFields = [];
 
-    function validate(type, value) {
+    const salutations = ["MR", "MRS", "MISS", "MS", "DR", "PROF"];
+
+    function validateField(label, value) {
         if (!value || value === "N/A") return true;
-        switch(type) {
-            case 'ID': return /^\d+$/.test(value); // Only numbers
-            case 'NAME': 
-            case 'GENDER': return /^[a-zA-Z\s]+$/.test(value); // Only characters
-            case 'PHONE': return /^[\d\+\-\s]+$/.test(value); // Numbers and basic symbols
-            default: return true;
-        }
+        if (label.includes('ID') || label.includes('PHONE')) return /^\+?\d+$/.test(value.replace(/[\s-]/g, ''));
+        if (label.includes('NAME') || label.includes('GENDER')) return /^[a-zA-Z\s\.]+$/.test(value);
+        return true;
     }
 
-    function cleanString(type, str) {
+    function cleanData(type, str) {
         if (!str) return "N/A";
-        switch(type) {
-            case 'ID': return str.replace(/\D/g, ''); // Strip non-numbers
-            case 'NAME': 
-            case 'GENDER': 
-                let cleaned = str.replace(/[^a-zA-Z\s]/g, ''); // Strip non-letters
-                return cleaned.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-            case 'PHONE': return str.replace(/[^\d+]/g, ''); // Keep digits and plus
-            default: return str.trim();
+        if (type === 'NUM') return str.replace(/\D/g, ''); 
+        if (type === 'CHAR') {
+            return str.replace(/[^a-zA-Z\s\.]/g, '').split(' ')
+                      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
         }
+        return str.trim();
     }
 
     function processData() {
-        const input = document.getElementById('rawInput').value;
-        if (!input.trim()) return;
+        let input = document.getElementById('rawInput').value.trim();
+        if (!input) return;
 
         let lines = input.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        let phoneNumbers = [];
-        let gender = "N/A";
-        let otherLines = [];
+        
+        // --- 1. SINGLE LINE IDENTIFICATION ---
+        // If only one line, try to split by ID (numbers) and Name (letters)
+        if (lines.length === 1) {
+            const pattern = /^(\d+)\s+(.*?)\s+(\+?\d[\d\s-]{7,})$/;
+            const match = input.match(pattern);
+            if (match) {
+                lines = [match[1], match[2], match[3]];
+            }
+        }
 
-        lines.forEach(line => {
+        // --- 2. SALUTATION MERGING ---
+        let mergedLines = [];
+        for (let i = 0; i < lines.length; i++) {
+            let current = lines[i];
+            let cleanUpper = current.replace(/\./g, '').toUpperCase();
+            
+            if (salutations.includes(cleanUpper) && i + 1 < lines.length) {
+                mergedLines.push(current + " " + lines[i+1]);
+                i++; // Skip next line
+            } else {
+                mergedLines.push(current);
+            }
+        }
+
+        // --- 3. GENDER & DATA EXTRACTION ---
+        let phoneNumbers = [];
+        let finalOtherLines = [];
+        let detectedGender = "N/A";
+
+        mergedLines.forEach(line => {
             const up = line.toUpperCase();
-            // Phone detection
-            if (line.match(/(\+?\d[\d\s\-]{7,}\d)/g)) {
-                phoneNumbers.push(...line.match(/(\+?\d[\d\s\-]{7,}\d)/g));
+            // Phone check
+            const phones = line.match(/(\+?\d[\d\s\-]{7,}\d)/g);
+            if (phones) {
+                phoneNumbers.push(...phones);
             } 
-            // Gender detection
-            else if (up === "MALE" || up === "FEMALE" || up === "M" || up === "F") {
-                gender = cleanString('GENDER', up);
-            } 
+            // Gender check from Salutation
+            else if (up.includes("MR ")) detectedGender = "Male";
+            else if (up.includes("MRS ") || up.includes("MISS ") || up.includes("MS ")) detectedGender = "Female";
+            else if (["MALE", "FEMALE", "M", "F"].includes(up)) {
+                detectedGender = up.startsWith('M') ? "Male" : "Female";
+            }
             else {
-                otherLines.push(line);
+                finalOtherLines.push(line);
             }
         });
 
-        const id = cleanString('ID', otherLines[0]);
-        const name = cleanString('NAME', otherLines[1]);
-        const address = otherLines.slice(2).join(", ") || "N/A";
-
+        // --- 4. FIELD ASSIGNMENT ---
         currentFields = [
-            { key: 'ID', label: 'ID (Numbers Only)', value: id },
-            { key: 'NAME', label: 'Name (Chars Only)', value: name },
-            { key: 'GENDER', label: 'Gender', value: gender },
-            { key: 'ADDR', label: 'Address', value: address }
+            { label: 'ID (Numbers)', value: cleanData('NUM', finalOtherLines[0]) },
+            { label: 'Name (Chars)', value: cleanData('CHAR', finalOtherLines[1] || finalOtherLines[0]) },
+            { label: 'Gender (Chars)', value: detectedGender },
+            { label: 'Address', value: finalOtherLines.slice(2).join(", ") || "N/A" }
         ];
 
         phoneNumbers.forEach((num, i) => {
-            currentFields.push({ key: 'PHONE', label: `Phone ${i+1}`, value: cleanString('PHONE', num) });
+            currentFields.push({ label: `Phone ${i+1} (Num)`, value: num.replace(/[^\d+]/g, '') });
         });
 
         renderDisplay();
@@ -143,44 +162,40 @@
 
     function renderDisplay() {
         const card = document.getElementById('resultCard');
-        card.innerHTML = currentFields.map((f, i) => {
-            const isValid = validate(f.key, f.value);
-            return `
+        card.innerHTML = currentFields.map((f, i) => `
             <div class="field-row">
                 <span class="label">${f.label}</span>
-                <div>
-                    <div class="value ${isValid ? '' : 'invalid'}" id="val-${i}" contenteditable="true" 
-                         onblur="updateValue(${i}, this)">${f.value}</div>
-                    <span class="error-msg">Invalid format for ${f.label}</span>
+                <div class="value ${validateField(f.label, f.value) ? '' : 'invalid'}" 
+                     id="val-${i}" contenteditable="true" 
+                     onblur="currentFields[${i}].value=this.innerText; this.classList.toggle('invalid', !validateField('${f.label}', this.innerText))">
+                     ${f.value}
                 </div>
                 <button class="copy-btn" onclick="copySingle('val-${i}', this)">Copy</button>
             </div>
-        `}).join('');
+        `).join('');
         document.getElementById('outputArea').style.display = 'block';
     }
 
-    function updateValue(index, el) {
-        currentFields[index].value = el.innerText.trim();
-        const isValid = validate(currentFields[index].key, currentFields[index].value);
-        el.classList.toggle('invalid', !isValid);
+    function copyFullData() {
+        const text = currentFields.map(f => `${f.label.split(' ')[0]}: ${f.value}`).join('\n');
+        navigator.clipboard.writeText(text).then(() => alert("All Data Copied!"));
     }
 
     function downloadVCF() {
-        const name = currentFields.find(f => f.key === 'NAME')?.value || 'Contact';
-        const address = currentFields.find(f => f.key === 'ADDR')?.value || '';
-        const gender = currentFields.find(f => f.key === 'GENDER')?.value || '';
-        const phones = currentFields.filter(f => f.key === 'PHONE');
+        const nameField = currentFields.find(f => f.label.includes('Name'));
+        const name = nameField ? nameField.value : 'Contact';
+        const phones = currentFields.filter(f => f.label.includes('Phone'));
+        const gender = currentFields.find(f => f.label.includes('Gender'))?.value;
 
         let vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\n`;
         phones.forEach(p => vcard += `TEL;TYPE=CELL:${p.value}\n`);
-        if(address !== 'N/A') vcard += `ADR:;;${address};;;;\n`;
-        vcard += `NOTE:Gender: ${gender}\nEND:VCARD`;
+        if (gender !== "N/A") vcard += `NOTE:Gender: ${gender}\n`;
+        vcard += `END:VCARD`;
 
         const blob = new Blob([vcard], { type: 'text/vcard' });
-        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `${name}.vcf`;
+        a.href = URL.createObjectURL(blob);
+        a.download = `${name.replace(/\s+/g, '_')}.vcf`;
         a.click();
     }
 
@@ -194,6 +209,7 @@
     function clearAll() {
         document.getElementById('rawInput').value = '';
         document.getElementById('outputArea').style.display = 'none';
+        currentFields = [];
     }
 </script>
 
